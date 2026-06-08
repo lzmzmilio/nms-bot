@@ -1,14 +1,8 @@
 name: NMS Bot
 
 on:
-  push:
-    branches:
-      - main
-
   schedule:
-    - cron: "0,14,28,42,56 * * * *"
-
-  workflow_dispatch:
+    - cron: "*/14 * * * *"
 
 permissions:
   contents: write
