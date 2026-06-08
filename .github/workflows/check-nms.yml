@@ -1,8 +1,12 @@
-name: Check No Man's Sky News
+name: NMS Bot
 
 on:
+  push:
+    branches:
+      - main
+
   schedule:
-    - cron: "*/14 * * * *"
+    - cron: "0,14,28,42,56 * * * *"
 
   workflow_dispatch:
 
@@ -26,7 +30,7 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Comprobar último post
+      - name: Comprobar ultimo post
         run: node check-nms.js
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
