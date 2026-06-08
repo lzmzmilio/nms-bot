@@ -2,7 +2,7 @@ name: NMS Bot
 
 on:
   schedule:
-    - cron: "*/14 * * * *"
+    - cron: "*/15 * * * *"
 
 permissions:
   contents: write
@@ -28,7 +28,7 @@ jobs:
         run: node check-nms.js
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          MIN_CHECK_INTERVAL_MINUTES: "14"
+          MIN_CHECK_INTERVAL_MINUTES: "15"
 
       - name: Guardar estado
         run: |
