@@ -1,8 +1,6 @@
 const fs = require("node:fs");
 
-const WP_API_URL =
-  "https://www.nomanssky.com/wp-json/wp/v2/posts?per_page=1&_embed=1";
-
+const NEWS_URL = "https://www.nomanssky.com/news/";
 const STATE_FILE = "state.json";
 
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || "";
@@ -58,6 +56,10 @@ function limitText(text = "", maxLength = 3800) {
   return `${clean.slice(0, maxLength - 1).trim()}…`;
 }
 
+function absolutizeUrl(url) {
+  return new URL(url, NEWS_URL).href;
+}
+
 function extractYoutubeUrl(htmlOrText = "") {
   const decoded = decodeHtmlEntities(htmlOrText);
 
@@ -86,6 +88,125 @@ function extractYoutubeUrl(htmlOrText = "") {
   }
 
   return null;
+}
+
+function extractFirstImage(html = "") {
+  const decoded = decodeHtmlEntities(html);
+
+  const ogImage = decoded.match(
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i
+  );
+
+  if (ogImage?.[1]) {
+    return absolutizeUrl(ogImage[1]);
+  }
+
+  const img = decoded.match(/<img[^>]+src=["']([^"']+)["']/i);
+
+  if (img?.[1]) {
+    return absolutizeUrl(img[1]);
+  }
+
+  return null;
+}
+
+async function fetchText(url) {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "NMS Discord Alerts",
+      Accept: "text/html,application/xhtml+xml,*/*",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} al leer ${url}`);
+  }
+
+  return response.text();
+}
+
+function getLatestArticleUrlFromNewsPage(html) {
+  const decoded = decodeHtmlEntities(html);
+
+  const matches = [
+    ...decoded.matchAll(
+      /href=["']([^"']*\/20\d{2}\/\d{2}\/[^"']+\/?)["']/gi
+    ),
+  ];
+
+  const urls = matches
+    .map((match) => absolutizeUrl(match[1]))
+    .filter((url) => url.startsWith("https://www.nomanssky.com/"));
+
+  const uniqueUrls = [...new Set(urls)];
+
+  if (uniqueUrls.length === 0) {
+    throw new Error("No se pudo encontrar ningún artículo en la página de noticias.");
+  }
+
+  return uniqueUrls[0];
+}
+
+function extractTitleFromArticle(html) {
+  const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+
+  if (h1?.[1]) {
+    return htmlToCleanText(h1[1]);
+  }
+
+  const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+
+  if (title?.[1]) {
+    return htmlToCleanText(title[1]).replace(/\s*-\s*No Man'?s Sky\s*$/i, "");
+  }
+
+  return "Nuevo post de No Man's Sky";
+}
+
+function extractDateFromArticle(html) {
+  const text = htmlToCleanText(html);
+
+  const match = text.match(
+    /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}\b/i
+  );
+
+  return match?.[0] || null;
+}
+
+function extractMainTextFromArticle(html, title, dateText) {
+  let articleHtml = html;
+
+  const h1Index = articleHtml.search(/<h1/i);
+
+  if (h1Index >= 0) {
+    articleHtml = articleHtml.slice(h1Index);
+  }
+
+  articleHtml = articleHtml
+    .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ");
+
+  let text = htmlToCleanText(articleHtml);
+
+  if (title) {
+    text = text.replace(title, "").trim();
+  }
+
+  if (dateText) {
+    text = text.replace(dateText, "").trim();
+  }
+
+  text = text
+    .replace(/\bContact\s+About\s+News\s+Press\s+Help Centre[\s\S]*$/i, "")
+    .replace(/\bCookie Policy\s+Privacy Policy[\s\S]*$/i, "")
+    .trim();
+
+  return (
+    text ||
+    "Nuevo contenido publicado en la web oficial de No Man's Sky."
+  );
 }
 
 function loadState() {
@@ -128,51 +249,27 @@ function shouldSkipBecauseTooSoon(state) {
     return false;
   }
 
-  const now = Date.now();
-  const elapsedMinutes = (now - lastChecked) / 1000 / 60;
+  const elapsedMinutes = (Date.now() - lastChecked) / 1000 / 60;
 
   return elapsedMinutes < MIN_CHECK_INTERVAL_MINUTES;
 }
 
 async function fetchLatestPost() {
-  const response = await fetch(WP_API_URL, {
-    headers: {
-      "User-Agent": "NMS Discord Alerts",
-      Accept: "application/json",
-    },
-  });
+  const newsHtml = await fetchText(NEWS_URL);
+  const latestUrl = getLatestArticleUrlFromNewsPage(newsHtml);
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} al leer la API de No Man's Sky`);
-  }
+  const articleHtml = await fetchText(latestUrl);
 
-  const posts = await response.json();
-
-  if (!Array.isArray(posts) || posts.length === 0) {
-    throw new Error("No se encontró ningún post en la API de No Man's Sky.");
-  }
-
-  const post = posts[0];
-
-  const title = htmlToCleanText(post.title?.rendered || "Nuevo post de No Man's Sky");
-  const contentHtml = post.content?.rendered || "";
-  const excerptHtml = post.excerpt?.rendered || "";
-  const bodyText =
-    htmlToCleanText(contentHtml) ||
-    htmlToCleanText(excerptHtml) ||
-    "Nuevo contenido publicado en la web oficial de No Man's Sky.";
-
-  const imageUrl =
-    post._embedded?.["wp:featuredmedia"]?.[0]?.source_url || null;
-
-  const youtubeUrl =
-    extractYoutubeUrl(contentHtml) || extractYoutubeUrl(excerptHtml);
+  const title = extractTitleFromArticle(articleHtml);
+  const dateText = extractDateFromArticle(articleHtml);
+  const bodyText = extractMainTextFromArticle(articleHtml, title, dateText);
+  const imageUrl = extractFirstImage(articleHtml);
+  const youtubeUrl = extractYoutubeUrl(articleHtml);
 
   return {
-    id: String(post.id || post.link),
     title,
-    url: post.link,
-    date: post.date,
+    url: latestUrl,
+    date: dateText,
     bodyText,
     imageUrl,
     youtubeUrl,
@@ -184,9 +281,7 @@ async function sendToDiscord(post) {
     throw new Error("No existe DISCORD_WEBHOOK_URL. No se puede publicar.");
   }
 
-  const contentLines = [
-    "?? **Nuevo post de No Man’s Sky**",
-  ];
+  const contentLines = ["?? **Nuevo post de No Man’s Sky**"];
 
   if (post.youtubeUrl) {
     contentLines.push(`?? ${post.youtubeUrl}`);
