@@ -19,12 +19,12 @@ function decodeHtmlEntities(text = "") {
     .replace(/&#038;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
-    .replace(/&#8217;/g, "’")
-    .replace(/&#8216;/g, "‘")
-    .replace(/&#8220;/g, "“")
-    .replace(/&#8221;/g, "”")
-    .replace(/&#8211;/g, "–")
-    .replace(/&#8212;/g, "—")
+    .replace(/&#8217;/g, "Ã¢â‚¬â„¢")
+    .replace(/&#8216;/g, "Ã¢â‚¬Ëœ")
+    .replace(/&#8220;/g, "Ã¢â‚¬Å“")
+    .replace(/&#8221;/g, "Ã¢â‚¬Â")
+    .replace(/&#8211;/g, "Ã¢â‚¬â€œ")
+    .replace(/&#8212;/g, "Ã¢â‚¬â€")
     .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
@@ -38,7 +38,7 @@ function htmlToCleanText(html = "") {
     .replace(/<\/p>/gi, "\n\n")
     .replace(/<\/h[1-6]>/gi, "\n\n")
     .replace(/<\/li>/gi, "\n")
-    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<li[^>]*>/gi, "Ã¢â‚¬Â¢ ")
     .replace(/<[^>]*>/g, " ")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
@@ -53,7 +53,7 @@ function limitText(text = "", maxLength = 900) {
     return clean;
   }
 
-  return `${clean.slice(0, maxLength - 1).trim()}…`;
+  return `${clean.slice(0, maxLength - 1).trim()}Ã¢â‚¬Â¦`;
 }
 
 function absolutizeUrl(url) {
@@ -141,7 +141,7 @@ function getLatestArticleUrlFromNewsPage(html) {
   const uniqueUrls = [...new Set(urls)];
 
   if (uniqueUrls.length === 0) {
-    throw new Error("No se pudo encontrar ningún artículo en la página de noticias.");
+    throw new Error("No se pudo encontrar ningÃƒÂºn artÃƒÂ­culo en la pÃƒÂ¡gina de noticias.");
   }
 
   return uniqueUrls[0];
@@ -230,7 +230,7 @@ function createCleanSummary(bodyText = "") {
   const summary = paragraphs.slice(0, 2).join("\n\n");
 
   return limitText(
-    summary || "Nuevo post publicado en la web oficial de No Man’s Sky.",
+    summary || "Nuevo post publicado en la web oficial de No ManÃ¢â‚¬â„¢s Sky.",
     900
   );
 }
@@ -259,7 +259,7 @@ function detectPostType(title = "", bodyText = "") {
 }
 
 function hasBugFixes(bodyText = "") {
-  return /\bBug Fixes\b/i.test(bodyText) || /•\s*Fixed/i.test(bodyText);
+  return /\bBug Fixes\b/i.test(bodyText) || /Ã¢â‚¬Â¢\s*Fixed/i.test(bodyText);
 }
 
 function loadState() {
@@ -342,7 +342,7 @@ async function sendToDiscord(post) {
   ];
 
   if (post.youtubeUrl) {
-    contentLines.push(`?? ${post.youtubeUrl}`);
+    contentLines.push(`Video: ${post.youtubeUrl}`);
   }
 
   const fields = [
@@ -411,7 +411,7 @@ async function sendToDiscord(post) {
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`Discord respondió HTTP ${response.status}: ${text}`);
+    throw new Error(`Discord respondiÃƒÂ³ HTTP ${response.status}: ${text}`);
   }
 }
 
@@ -420,14 +420,14 @@ async function main() {
 
   if (shouldSkipBecauseTooSoon(state)) {
     console.log(
-      `Saltado: todavía no han pasado ${MIN_CHECK_INTERVAL_MINUTES} minutos desde la última comprobación real.`
+      `Saltado: todavÃƒÂ­a no han pasado ${MIN_CHECK_INTERVAL_MINUTES} minutos desde la ÃƒÂºltima comprobaciÃƒÂ³n real.`
     );
     return;
   }
 
   const latestPost = await fetchLatestPost();
 
-  console.log("Último post detectado:", latestPost.title);
+  console.log("ÃƒÅ¡ltimo post detectado:", latestPost.title);
   console.log("URL:", latestPost.url);
 
   if (!state.lastSeenUrl) {
@@ -438,7 +438,7 @@ async function main() {
       lastCheckedAt: new Date().toISOString(),
     });
 
-    console.log("Primera ejecución segura: guardado el último post sin publicar.");
+    console.log("Primera ejecuciÃƒÂ³n segura: guardado el ÃƒÂºltimo post sin publicar.");
     return;
   }
 
@@ -463,7 +463,7 @@ async function main() {
     lastCheckedAt: new Date().toISOString(),
   });
 
-  console.log("Publicado 1 único post nuevo en Discord.");
+  console.log("Publicado 1 ÃƒÂºnico post nuevo en Discord.");
 }
 
 main().catch((error) => {
