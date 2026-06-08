@@ -1,0 +1,64 @@
+name: Check No Man's Sky News
+
+on:
+  # Ejecuta el workflow automáticamente cada 15 minutos aproximadamente.
+  # Minutos: 7, 22, 37 y 52 de cada hora.
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+
+  # Permite ejecutarlo manualmente desde la pestaña Actions de GitHub.
+  workflow_dispatch:
+
+# Permiso necesario para que GitHub Actions pueda actualizar state.json
+# y hacer commit/push automático.
+permissions:
+  contents: write
+
+# Evita que dos ejecuciones se pisen entre sí.
+concurrency:
+  group: nms-discord-alerts
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Descarga el contenido del repositorio en la máquina temporal de GitHub.
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      # Instala/prepara Node.js en GitHub Actions.
+      - name: Usar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Ejecuta nuestro script.
+      # DISCORD_WEBHOOK_URL se leerá desde los Secrets del repositorio.
+      - name: Comprobar novedades
+        run: node check-nms.js
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          POST_ON_FIRST_RUN: "false"
+
+      # Guarda state.json si el script lo ha creado o actualizado.
+      # state.json sirve para recordar qué posts ya se han visto.
+      - name: Guardar estado
+        run: |
+          if [ ! -f state.json ]; then
+            echo "No se ha generado state.json. No hay nada que guardar."
+            exit 0
+          fi
+
+          git config user.name "nms-discord-alerts"
+          git config user.email "nms-discord-alerts@users.noreply.github.com"
+
+          git add state.json
+
+          if git diff --cached --quiet; then
+            echo "No hay cambios de estado."
+          else
+            git commit -m "Update seen NMS posts"
+            git push
+          fi
