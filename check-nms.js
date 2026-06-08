@@ -19,12 +19,12 @@ function decodeHtmlEntities(text = "") {
     .replace(/&#038;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
-    .replace(/&#8217;/g, "í")
-    .replace(/&#8216;/g, "ë")
-    .replace(/&#8220;/g, "ì")
-    .replace(/&#8221;/g, "î")
-    .replace(/&#8211;/g, "ñ")
-    .replace(/&#8212;/g, "ó")
+    .replace(/&#8217;/g, "‚Äô")
+    .replace(/&#8216;/g, "‚Äò")
+    .replace(/&#8220;/g, "‚Äú")
+    .replace(/&#8221;/g, "‚Äù")
+    .replace(/&#8211;/g, "‚Äì")
+    .replace(/&#8212;/g, "‚Äî")
     .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
@@ -38,7 +38,7 @@ function htmlToCleanText(html = "") {
     .replace(/<\/p>/gi, "\n\n")
     .replace(/<\/h[1-6]>/gi, "\n\n")
     .replace(/<\/li>/gi, "\n")
-    .replace(/<li[^>]*>/gi, "ï ")
+    .replace(/<li[^>]*>/gi, "‚Ä¢ ")
     .replace(/<[^>]*>/g, " ")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
@@ -53,7 +53,7 @@ function limitText(text = "", maxLength = 900) {
     return clean;
   }
 
-  return `${clean.slice(0, maxLength - 1).trim()}Ö`;
+  return `${clean.slice(0, maxLength - 1).trim()}‚Ä¶`;
 }
 
 function absolutizeUrl(url) {
@@ -141,7 +141,7 @@ function getLatestArticleUrlFromNewsPage(html) {
   const uniqueUrls = [...new Set(urls)];
 
   if (uniqueUrls.length === 0) {
-    throw new Error("No se pudo encontrar ning˙n artÌculo en la p·gina de noticias.");
+    throw new Error("No se pudo encontrar ning√∫n art√≠culo en la p√°gina de noticias.");
   }
 
   return uniqueUrls[0];
@@ -230,7 +230,7 @@ function createCleanSummary(bodyText = "") {
   const summary = paragraphs.slice(0, 2).join("\n\n");
 
   return limitText(
-    summary || "Nuevo post publicado en la web oficial de No Manís Sky.",
+    summary || "Nuevo post publicado en la web oficial de No Man‚Äôs Sky.",
     900
   );
 }
@@ -259,7 +259,7 @@ function detectPostType(title = "", bodyText = "") {
 }
 
 function hasBugFixes(bodyText = "") {
-  return /\bBug Fixes\b/i.test(bodyText) || /ï\s*Fixed/i.test(bodyText);
+  return /\bBug Fixes\b/i.test(bodyText) || /‚Ä¢\s*Fixed/i.test(bodyText);
 }
 
 function loadState() {
@@ -338,7 +338,7 @@ async function sendToDiscord(post) {
   }
 
   const contentLines = [
-    "?? **Nuevo post oficial de No Manís Sky**",
+    ":rocket: **Nuevo post oficial de No Man's Sky**",
   ];
 
   if (post.youtubeUrl) {
@@ -411,7 +411,7 @@ async function sendToDiscord(post) {
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`Discord respondiÛ HTTP ${response.status}: ${text}`);
+    throw new Error(`Discord respondi√≥ HTTP ${response.status}: ${text}`);
   }
 }
 
@@ -420,14 +420,14 @@ async function main() {
 
   if (shouldSkipBecauseTooSoon(state)) {
     console.log(
-      `Saltado: todavÌa no han pasado ${MIN_CHECK_INTERVAL_MINUTES} minutos desde la ˙ltima comprobaciÛn real.`
+      `Saltado: todav√≠a no han pasado ${MIN_CHECK_INTERVAL_MINUTES} minutos desde la √∫ltima comprobaci√≥n real.`
     );
     return;
   }
 
   const latestPost = await fetchLatestPost();
 
-  console.log("⁄ltimo post detectado:", latestPost.title);
+  console.log("√öltimo post detectado:", latestPost.title);
   console.log("URL:", latestPost.url);
 
   if (!state.lastSeenUrl) {
@@ -438,7 +438,7 @@ async function main() {
       lastCheckedAt: new Date().toISOString(),
     });
 
-    console.log("Primera ejecuciÛn segura: guardado el ˙ltimo post sin publicar.");
+    console.log("Primera ejecuci√≥n segura: guardado el √∫ltimo post sin publicar.");
     return;
   }
 
@@ -463,7 +463,7 @@ async function main() {
     lastCheckedAt: new Date().toISOString(),
   });
 
-  console.log("Publicado 1 ˙nico post nuevo en Discord.");
+  console.log("Publicado 1 √∫nico post nuevo en Discord.");
 }
 
 main().catch((error) => {
