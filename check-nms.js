@@ -5,7 +5,7 @@ const STATE_FILE = "state.json";
 
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || "";
 const MIN_CHECK_INTERVAL_MINUTES = Number(
-  process.env.MIN_CHECK_INTERVAL_MINUTES || 14
+  process.env.MIN_CHECK_INTERVAL_MINUTES || 15
 );
 
 function decodeHtmlEntities(text = "") {
@@ -46,7 +46,7 @@ function htmlToCleanText(html = "") {
     .trim();
 }
 
-function limitText(text = "", maxLength = 3800) {
+function limitText(text = "", maxLength = 900) {
   const clean = String(text).trim();
 
   if (clean.length <= maxLength) {
@@ -209,6 +209,59 @@ function extractMainTextFromArticle(html, title, dateText) {
   );
 }
 
+function createCleanSummary(bodyText = "") {
+  const text = bodyText
+    .replace(/\r/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  const beforeBugFixes = text.split(/\bBug Fixes\b/i)[0].trim();
+
+  const usefulText = beforeBugFixes || text;
+
+  const paragraphs = usefulText
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .filter((paragraph) => !/^hello everyone[,]?$/i.test(paragraph))
+    .filter((paragraph) => !/^thank you[,]?$/i.test(paragraph))
+    .filter((paragraph) => paragraph.length > 40);
+
+  const summary = paragraphs.slice(0, 2).join("\n\n");
+
+  return limitText(
+    summary || "Nuevo post publicado en la web oficial de No Man’s Sky.",
+    900
+  );
+}
+
+function detectPostType(title = "", bodyText = "") {
+  const combined = `${title}\n${bodyText}`.toLowerCase();
+
+  if (
+    combined.includes("patch") ||
+    combined.includes("hotfix") ||
+    combined.includes("bug fixes") ||
+    /\b\d+\.\d+/.test(title)
+  ) {
+    return "Patch / Hotfix";
+  }
+
+  if (
+    combined.includes("expedition") ||
+    combined.includes("update") ||
+    combined.includes("release")
+  ) {
+    return "Update / Anuncio";
+  }
+
+  return "Noticia";
+}
+
+function hasBugFixes(bodyText = "") {
+  return /\bBug Fixes\b/i.test(bodyText) || /•\s*Fixed/i.test(bodyText);
+}
+
 function loadState() {
   if (!fs.existsSync(STATE_FILE)) {
     return {};
@@ -273,6 +326,9 @@ async function fetchLatestPost() {
     bodyText,
     imageUrl,
     youtubeUrl,
+    postType: detectPostType(title, bodyText),
+    summary: createCleanSummary(bodyText),
+    hasBugFixes: hasBugFixes(bodyText),
   };
 }
 
@@ -281,22 +337,49 @@ async function sendToDiscord(post) {
     throw new Error("No existe DISCORD_WEBHOOK_URL. No se puede publicar.");
   }
 
-  const contentLines = ["?? **Nuevo post de No Man’s Sky**"];
+  const contentLines = [
+    "?? **Nuevo post oficial de No Man’s Sky**",
+  ];
 
   if (post.youtubeUrl) {
     contentLines.push(`?? ${post.youtubeUrl}`);
   }
 
+  const fields = [
+    {
+      name: "Tipo",
+      value: post.postType,
+      inline: true,
+    },
+  ];
+
+  if (post.date) {
+    fields.push({
+      name: "Fecha",
+      value: post.date,
+      inline: true,
+    });
+  }
+
+  if (post.hasBugFixes) {
+    fields.push({
+      name: "Detalles",
+      value: "Incluye cambios, correcciones y bug fixes. Ver lista completa en el post oficial.",
+      inline: false,
+    });
+  }
+
+  fields.push({
+    name: "Post oficial",
+    value: `[Leer completo en nomanssky.com](${post.url})`,
+    inline: false,
+  });
+
   const embed = {
     title: limitText(post.title, 250),
     url: post.url,
-    description: limitText(post.bodyText, 3800),
-    fields: [
-      {
-        name: "Post oficial",
-        value: `[Leer completo en nomanssky.com](${post.url})`,
-      },
-    ],
+    description: post.summary,
+    fields,
     footer: {
       text: "No Man's Sky / Hello Games",
     },
